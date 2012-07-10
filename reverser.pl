@@ -33,10 +33,10 @@ my $pingq= Thread::Queue->new();
 my $nbq= Thread::Queue->new();
 
 # Setup Threads
-my $thr = threads->create('forwardlookup');
-my $reversethr = threads->create('reverselookup');
 my @pingthreads = map{threads->create('pinger')} (0 .. 4);
 my @nbthreads = map{threads->create('nblooker')} (0 .. 4);
+my $reversethr = threads->create('reverselookup');
+my $thr = threads->create('forwardlookup');
 $thr->join;
 $reversethr->join;
 foreach (@pingthreads) {$_->join}
