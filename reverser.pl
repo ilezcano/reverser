@@ -28,7 +28,6 @@ $outputcsv->add_line($fields);
 
 # Setup Queues
 my $forwardq= Thread::Queue->new(keys %fqdnarray);
-$forwardq->enqueue(undef);
 my $reverseq= Thread::Queue->new();
 my $pingq= Thread::Queue->new();
 my $nbq= Thread::Queue->new();
@@ -36,8 +35,8 @@ my $nbq= Thread::Queue->new();
 # Setup Threads
 my @pingthreads = map{threads->create('pinger')} (0 .. 4);
 my @nbthreads = map{threads->create('nblooker')} (0 .. 4);
-my $reversethr = threads->create('reverselookup');
-my $thr = threads->create('forwardlookup');
+my @reversethreads = map{threads->create('reverselookup')} (0 .. 1);
+my @forthr = map{threads->create('forwardlookup')} (0 .. 1);
 $|++;
 do
 	{
@@ -45,8 +44,13 @@ do
 	sleep 1;
 	}
 	while (($forwardq->pending() gt 0) or ($reverseq->pending() gt 0) or ($pingq->pending() gt 0) or ($nbq->pending() gt 0));
-$thr->join;
-$reversethr->join;
+
+# Finalize Queues and Join threads
+foreach (@forthr) { $forwardq->enqueue(undef) }
+foreach (@forthr) { $_->join }
+foreach (@reversethreads) { $reverseq->enqueue(undef, undef) }
+foreach (@reversethreads) { $_->join }
+foreach (@pingthreads) {$pingq->enqueue(undef, undef)}
 foreach (@pingthreads) {$_->join}
 foreach (@nbthreads) {$nbq->enqueue(undef, undef)}
 foreach (@nbthreads) {$_->join}
@@ -100,8 +104,6 @@ sub forwardlookup
 			${$fqdnarray{$fqdn}}[0] = 'Not Found';
 			}
 		}
-	$reverseq->enqueue(undef, undef);
-	foreach (0 .. 4) {$pingq->enqueue(undef, undef)}
 }
 
 sub reverselookup
