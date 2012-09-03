@@ -20,6 +20,7 @@ while (<FH>)
 	}
 close (FH);
 
+my $ns = [qw/134.65.213.75/];
 # Setup CSV
 my $fields =  ['fqdn', 'ip', 'reverse value', 'responds', 'NBName', 'is match?', 'Which Correct?'];
 my $outputcsv = Class::CSV->new( fields=> $fields);
@@ -40,14 +41,14 @@ my $thr = threads->create('forwardlookup');
 $|++;
 do
 	{
-	printf "Forward-Q %u, Reverse-Q %u, Ping-Q %u, NB-Q %u\r", $forwardq->pending(), $reverseq->pending(), $pingq->pending(), $nbq->pending();
+	printf "Forward-Q %u, Reverse-Q %u, Ping-Q %u, NB-Q %u     \r", $forwardq->pending(), $reverseq->pending(), $pingq->pending(), $nbq->pending();
 	sleep 1;
 	}
-while ($forwardq->pending() gt 0);
+	while (($forwardq->pending() gt 0) or ($reverseq->pending() gt 0) or ($pingq->pending() gt 0) or ($nbq->pending() gt 0));
 $thr->join;
 $reversethr->join;
 foreach (@pingthreads) {$_->join}
-foreach (0 .. 4) {$nbq->enqueue(undef, undef)}
+foreach (@nbthreads) {$nbq->enqueue(undef, undef)}
 foreach (@nbthreads) {$_->join}
 
 while ((my $fqdn, my $array) = each %fqdnarray)
@@ -83,7 +84,7 @@ close (FF);
 sub forwardlookup
 {
 	require Net::DNS;
-	my $res = Net::DNS::Resolver->new();
+	my $res = Net::DNS::Resolver->new(nameservers=>$ns);
 	while (my $fqdn = $forwardq->dequeue())
 		{
 		my $answerpacket = $res->query($fqdn, 'IN', 'A');
@@ -106,7 +107,7 @@ sub forwardlookup
 sub reverselookup
 {
 	require Net::DNS;
-	my $res = Net::DNS::Resolver->new();
+	my $res = Net::DNS::Resolver->new(nameservers=>$ns);
 	while ((my $fqdn, my $ip) = $reverseq->dequeue(2))
 		{
 		last unless $fqdn;
