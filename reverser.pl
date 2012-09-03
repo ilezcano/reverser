@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 #
 use strict;
 use Class::CSV;
@@ -37,6 +37,13 @@ my @pingthreads = map{threads->create('pinger')} (0 .. 4);
 my @nbthreads = map{threads->create('nblooker')} (0 .. 4);
 my $reversethr = threads->create('reverselookup');
 my $thr = threads->create('forwardlookup');
+$|++;
+do
+	{
+	printf "Forward-Q %u, Reverse-Q %u, Ping-Q %u, NB-Q %u\r", $forwardq->pending(), $reverseq->pending(), $pingq->pending(), $nbq->pending();
+	sleep 1;
+	}
+while ($forwardq->pending() gt 0);
 $thr->join;
 $reversethr->join;
 foreach (@pingthreads) {$_->join}
@@ -68,7 +75,9 @@ foreach my $lineref (@{$outputcsv->lines()})
 	elsif ($fqdn =~ /$nbname/i) { $lineref->set('Which Correct?' => 'Forward')}
 	else { $lineref->set('Which Correct?' => 'Neither')}
 	}
-$outputcsv->print;
+open (FF, ">output.csv");
+print FF $outputcsv->string;
+close (FF);
 
 
 sub forwardlookup
